@@ -1,8 +1,18 @@
 #!/usr/bin/env bash
+
+SCRIPT_NAME="linux-fresh-apples"
+SCRIPT_VERSION="v1.0.0"
+
+# Version flag
+if [[ "$1" == "--version" || "${1:-}" == "-v" ]]; then
+  echo "$SCRIPT_NAME $SCRIPT_VERSION"
+  exit 0
+fi
+
 set -euo pipefail
 
 echo "=========================================="
-echo " Linux Fresh Apples – Setup Script"
+echo " Linux Fresh Apples – Setup Script ($SCRIPT_VERSION)"
 echo "=========================================="
 echo
 echo "This script will:"
