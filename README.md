@@ -44,11 +44,15 @@ Use **whichever method you prefer**.
 ### Run directly (no repo kept)
 
 curl -fsSL https://raw.githubusercontent.com/garduru/linux-fresh-apples/refs/tags/v1.0.0/setup.sh -o setup.sh
+
 chmod +x setup.sh
+
 sudo ./setup.sh
 
 ### OR Clone the repo
 
 git clone https://github.com/garduru/linux-fresh-apples.git
+
 cd linux-fresh-apples
+
 sudo ./setup.sh
