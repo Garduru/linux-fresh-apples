@@ -1,6 +1,27 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+echo "=========================================="
+echo " Linux Fresh Apples – Setup Script"
+echo "=========================================="
+echo
+echo "This script will:"
+echo " - Install system and desktop packages"
+echo " - Enable Flatpak + Flathub"
+echo " - Configure firewalld (KDE Connect)"
+echo " - Optionally remove duplicate GUI packages"
+echo
+read -rp "Continue? (yes/no): " CONFIRM
+
+if [[ "$CONFIRM" != "yes" ]]; then
+  echo "Aborted."
+  exit 1
+fi
+
+echo
+echo "Starting setup..."
+echo
+
 
 ###############################################################################
 # Linux Setup Script (Arch/CachyOS-focused)
