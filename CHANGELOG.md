@@ -6,6 +6,25 @@ This project loosely follows **Semantic Versioning (SemVer)**.
 
 ---
 
+## [1.0.1] – 2026-01-21
+
+### Fixed
+- Corrected Sunshine user service enablement under Wayland
+- Ensured Sunshine capability (`cap_sys_admin+p`) is applied to the real binary (symlink-safe)
+- Fixed first-run Sunshine startup reliability by restarting PipeWire and xdg-desktop-portal services
+- Corrected curl-based installer instructions to point at valid GitHub raw paths
+- Prevented false Sunshine install failures caused by Flatpak-only installs
+- Improved detection and handling of existing packages for safe re-runs
+
+### Improved
+- Reorganized script execution order for better safety and clarity
+- Clearer setup output and status messages
+- More reliable KDE Connect firewall configuration via firewalld
+- Safer duplicate GUI package cleanup logic
+- Script can now be run repeatedly without breaking the system
+
+---
+
 ## [1.0.0] – 2026-01-19
 
 ### Added
