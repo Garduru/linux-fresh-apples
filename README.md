@@ -1,65 +1,104 @@
 ![Release](https://img.shields.io/github/v/release/garduru/linux-fresh-apples?label=release)
+
 ![License](https://img.shields.io/github/license/garduru/linux-fresh-apples)
+
 ![Platform](https://img.shields.io/badge/platform-Arch%20%7C%20CachyOS-blue)
+
 # 🍎 Linux Fresh Apples 🍎
 
-Personal Linux setup script (Arch / CachyOS focused) for turning a fresh install into a usable daily-driver system.
+**Personal Linux post-install setup script**  
+*Arch Linux / CachyOS focused*
 
-This is a **post-install bootstrap script** I use after installing Arch-based distros (especially CachyOS) to get my system configured quickly, cleanly, and consistently.
+Turn a fresh Arch-based install into a clean, usable daily-driver **safely and repeatably**.
+
+---
+
+## What is this?
+
+**Linux Fresh Apples** is a **post-install bootstrap script** I use after installing Arch-based distros (especially CachyOS) to configure my system quickly, consistently, and without clutter.
+
+It is designed to be:
+
+- ✅ Safe to re-run (idempotent)
+- ✅ Flatpak-first for GUI apps (avoids duplicates)
+- ✅ Wayland-aware
+- ✅ Explicit and readable (no magic)
+- 🚧 Evolving toward a toggleable terminal UI (TUI)
 
 ---
 
 ## ✨ What this script does
 
+### System & CLI
 - Updates pacman package databases
-- Installs core CLI and system packages
+- Installs core system + CLI tools
+- Uses `--needed` installs to avoid unnecessary changes
+
+### Flatpak & Apps
 - Enables Flatpak and Flathub
-- Installs desktop applications via Flatpak (prevents duplicates)
-- Installs and configures **Sunshine** (Moonlight game streaming host)
-  - Applies required capabilities for KMS capture
-  - Enables Sunshine as a **user service**
-  - Starts Sunshine automatically on login
-  - Displays Sunshine Web UI URL for first-time setup
-- Configures firewalld for KDE Connect
-- Optionally removes duplicate pacman GUI applications
+- Installs desktop apps via Flatpak to prevent duplication
 - Ensures **ProtonPlus** is installed
-- Removes **ProtonUp-Qt** to prevent duplicate Proton managers
-- Prompts for confirmation before making any system changes
+- Removes **ProtonUp-Qt** to avoid multiple Proton managers
+
+### Sunshine (Moonlight host)
+- Installs Sunshine via pacman
+- Applies required capabilities for **KMS capture** (symlink-safe)
+- Auto-selects a free RTSP port if the default is already in use
+- Writes minimal user config (`rtsp_port`) safely
+- Enables Sunshine as a **user service**
+- Restarts PipeWire + portals for Wayland reliability
+- Displays Sunshine Web UI URL for first-time setup
+
+### Firewall
+- Configures `firewalld` for KDE Connect
+- Uses built-in `kdeconnect` service if available
+- Falls back to explicit port rules if needed
+
+### Cleanup
+- Removes duplicate **pacman GUI apps** when Flatpak versions are present
+- Never touches Flatpaks during cleanup
+
+### Safety
+- Prints exactly what will happen
+- Requires typing **yes** before making changes
+- Aborts cleanly otherwise
 
 ---
 
-## 🖥 Supported systems
+## 🖥️ Supported systems
 
 - Arch Linux
 - CachyOS
 - Other Arch-based distros *may work* but are not guaranteed
 
-⚠️ This script uses:
-- `pacman`
-- `flatpak`
-- `firewalld`
+⚠️ Uses:
+- pacman
+- flatpak
+- firewalld
 
 ---
 
-## 🔐 Safety confirmation
+## 🔐 Safety model
 
 Before doing anything, the script:
 
-- Prints **exactly what it will do**
-- Requires typing **`yes`** to continue
+- Explains all major actions
+- Requires explicit confirmation
+- Uses defensive checks for:
+  - Installed packages
+  - Active user sessions
+  - Existing services
+  - Wayland quirks
 
-Anything else safely aborts.
+You can re-run the script at any time without breaking your system.
 
 ---
 
-## Installation & usage
-
-You can run the script **directly from GitHub** or **clone the repo**.  
-Use **whichever method you prefer**.
+## 🚀 Installation & usage
 
 ### Run directly (no repo kept)
 
-curl -fsSL https://raw.githubusercontent.com/garduru/linux-fresh-apples/refs/tags/v1.0.0/setup.sh -o setup.sh
+curl -fsSL https://raw.githubusercontent.com/garduru/linux-fresh-apples/refs/tags/v1.1.0/setup.sh -o setup.sh
 
 chmod +x setup.sh
 
