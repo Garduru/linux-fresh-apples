@@ -1,3 +1,6 @@
+![Release](https://img.shields.io/github/v/release/garduru/linux-fresh-apples?label=release)
+![License](https://img.shields.io/github/license/garduru/linux-fresh-apples)
+![Platform](https://img.shields.io/badge/platform-Arch%20%7C%20CachyOS-blue)
 # 🍎 Linux Fresh Apples 🍎
 
 Personal Linux setup script (Arch / CachyOS focused) for turning a fresh install into a usable daily-driver system.
