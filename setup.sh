@@ -62,6 +62,141 @@ enable_service() {
 }
 
 # -------------------------------
+# Terminal UI (gum) + fallback
+# -------------------------------
+
+# Default toggles (if user cancels UI, everything runs)
+DO_PACMAN=true
+DO_FLATPAK=true
+DO_FLATHUB=true
+DO_SUNSHINE=true
+DO_FIREWALL=true
+DO_DEDUPE=true
+DO_PROTON_ENFORCE=true
+
+maybe_install_gum() {
+  if command -v gum >/dev/null 2>&1; then
+    return 0
+  fi
+
+  # Only attempt if pacman exists and we're root
+  if command -v pacman >/dev/null 2>&1 && [[ "${EUID}" -eq 0 ]]; then
+    # minimal refresh; ignore failures so script stays resilient
+    pacman -Sy --noconfirm >/dev/null 2>&1 || true
+    pacman -S --noconfirm --needed gum >/dev/null 2>&1 || true
+  fi
+
+  command -v gum >/dev/null 2>&1
+}
+
+ask_yn() {
+  local prompt="$1"
+  local default="${2:-yes}" # yes/no
+  local ans=""
+  while true; do
+    if [[ "$default" == "yes" ]]; then
+      read -rp "$prompt [Y/n]: " ans
+      ans="${ans:-y}"
+    else
+      read -rp "$prompt [y/N]: " ans
+      ans="${ans:-n}"
+    fi
+    case "${ans,,}" in
+      y|yes) return 0 ;;
+      n|no)  return 1 ;;
+      *) echo "Please answer yes or no." ;;
+    esac
+  done
+}
+
+run_tui() {
+  # Reset to defaults each run
+  DO_PACMAN=true
+  DO_FLATPAK=true
+  DO_FLATHUB=true
+  DO_SUNSHINE=true
+  DO_FIREWALL=true
+  DO_DEDUPE=true
+  DO_PROTON_ENFORCE=true
+
+  echo "=========================================="
+  echo " Linux Fresh Apples – Setup Script ($SCRIPT_VERSION)"
+  echo "=========================================="
+  echo
+
+  echo "This script can run these steps:"
+  echo "  - Pacman packages (system + CLI tools)"
+  echo "  - Flatpak + Flathub + Flatpak apps"
+  echo "  - Sunshine setup (Moonlight host)"
+  echo "  - Firewall rules (KDE Connect)"
+  echo "  - Remove duplicate pacman GUI apps"
+  echo "  - Proton tools enforcement (ProtonPlus only)"
+  echo
+
+  if maybe_install_gum; then
+    gum style --border normal --padding "1 2" --margin "1 0" \
+      "Select what you want to run" \
+      "Space = toggle • Enter = confirm • Esc = run defaults (everything)"
+
+    local selections
+    selections="$(gum choose --no-limit \
+      "Pacman: core system + CLI packages" \
+      "Flatpak: enable Flathub + install apps" \
+      "Sunshine: setcap + user service + RTSP port fix" \
+      "Firewall: KDE Connect rules (firewalld)" \
+      "Cleanup: remove duplicate pacman GUI apps" \
+      "Proton: enforce ProtonPlus + remove ProtonUp-Qt")" || true
+
+    # If user made selections (non-empty), run only selected
+    if [[ -n "${selections:-}" ]]; then
+      DO_PACMAN=false
+      DO_FLATPAK=false
+      DO_FLATHUB=false
+      DO_SUNSHINE=false
+      DO_FIREWALL=false
+      DO_DEDUPE=false
+      DO_PROTON_ENFORCE=false
+
+      while IFS= read -r line; do
+        case "$line" in
+          "Pacman: core system + CLI packages") DO_PACMAN=true ;;
+          "Flatpak: enable Flathub + install apps") DO_FLATPAK=true; DO_FLATHUB=true ;;
+          "Sunshine: setcap + user service + RTSP port fix") DO_SUNSHINE=true ;;
+          "Firewall: KDE Connect rules (firewalld)") DO_FIREWALL=true ;;
+          "Cleanup: remove duplicate pacman GUI apps") DO_DEDUPE=true ;;
+          "Proton: enforce ProtonPlus + remove ProtonUp-Qt") DO_PROTON_ENFORCE=true ;;
+        esac
+      done <<< "$selections"
+    fi
+
+    gum style --margin "1 0" --foreground 212 "Selections:"
+    printf "  Pacman:   %s\n" "$DO_PACMAN"
+    printf "  Flatpak:  %s\n" "$DO_FLATPAK"
+    printf "  Sunshine: %s\n" "$DO_SUNSHINE"
+    printf "  Firewall: %s\n" "$DO_FIREWALL"
+    printf "  Cleanup:  %s\n" "$DO_DEDUPE"
+    printf "  Proton:   %s\n" "$DO_PROTON_ENFORCE"
+    echo
+
+    gum confirm "Continue?" || { echo "Aborted."; exit 1; }
+  else
+    echo "gum not available. Using simple prompts."
+    if ! ask_yn "Run pacman system/CLI package install?" yes; then DO_PACMAN=false; fi
+    if ! ask_yn "Run Flatpak + Flathub + Flatpak app installs?" yes; then DO_FLATPAK=false; DO_FLATHUB=false; fi
+    if ! ask_yn "Run Sunshine setup (Moonlight host)?" yes; then DO_SUNSHINE=false; fi
+    if ! ask_yn "Configure firewalld for KDE Connect?" yes; then DO_FIREWALL=false; fi
+    if ! ask_yn "Remove duplicate pacman GUI apps (if present)?" yes; then DO_DEDUPE=false; fi
+    if ! ask_yn "Enforce ProtonPlus + remove ProtonUp-Qt?" yes; then DO_PROTON_ENFORCE=false; fi
+    echo
+    if ! ask_yn "Continue with selected steps?" yes; then echo "Aborted."; exit 1; fi
+  fi
+
+  echo
+  echo "Starting setup..."
+  echo
+}
+
+# -------------------------------
 # Sunshine helpers
 # -------------------------------
 
@@ -102,9 +237,6 @@ run_user_systemctl() {
 }
 
 # Write/update Sunshine config to avoid RTSP port collision (common issue)
-# NOTE: Sunshine supports a simple key=value style config file at:
-#   ~/.config/sunshine/sunshine.conf
-# We only touch rtsp_port here (safe/minimal).
 ensure_sunshine_rtsp_port() {
   local target_user="$1"
   local rtsp_port="$2"
@@ -131,45 +263,8 @@ ensure_sunshine_rtsp_port() {
   log "Sunshine config updated: rtsp_port=$rtsp_port (in $cfg_file)"
 }
 
-# ----------------------------- UI / INTRO ------------------------------------
-
-echo "=========================================="
-echo " Linux Fresh Apples – Setup Script ($SCRIPT_VERSION)"
-echo "=========================================="
-echo
-echo "This script will:"
-echo "  1) Update package databases"
-echo "  2) Install core pacman packages (system + CLI tools)"
-echo "  3) Enable Flatpak + Flathub"
-echo "  4) Install your desktop apps via Flatpak (prevents duplicates)"
-echo "  5) Install & configure Sunshine (Moonlight host)"
-echo "     • Apply required capability (setcap) for KMS capture"
-echo "     • Auto-pick a free RTSP port if the default is taken"
-echo "     • Enable + start Sunshine as a user service"
-echo "     • Show Sunshine Web UI URL for first-time setup"
-echo "  6) Configure firewall (KDE Connect)"
-echo "  7) Optionally remove duplicate pacman GUI packages"
-echo
-read -rp "Continue? (yes/no): " CONFIRM
-if [[ "$CONFIRM" != "yes" ]]; then
-  echo "Aborted."
-  exit 1
-fi
-
-echo
-echo "Starting setup..."
-echo
-
 ###############################################################################
 # Linux Setup Script (Arch/CachyOS-focused)
-#
-# Goals:
-# - Flatpak for desktop apps (avoid duplicates, works across distros)
-# - Pacman for system + CLI tools
-# - Optional cleanup: remove common pacman GUI apps if you prefer Flatpaks
-#
-# NOTE:
-# - This is written for Arch/CachyOS (pacman)
 ###############################################################################
 
 # ----------------------------- CONFIG SECTION --------------------------------
@@ -216,162 +311,165 @@ PACMAN_PKGS=(
 
 ensure_sudo
 
-log "1) Updating package databases"
-pacman -Sy --noconfirm
+# Selection UI / prompts
+run_tui
 
-log "2) Installing core pacman packages (system + CLI tools)"
-pacman_install "${PACMAN_PKGS[@]}"
+if [[ "$DO_PACMAN" == "true" ]]; then
+  log "1) Updating package databases"
+  pacman -Sy --noconfirm
 
-log "3) Ensuring Flatpak has Flathub enabled"
-if ! flatpak remote-list | awk '{print $1}' | grep -qx "flathub"; then
-  log "Adding Flathub remote"
-  flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+  log "2) Installing core pacman packages (system + CLI tools)"
+  pacman_install "${PACMAN_PKGS[@]}"
 else
-  log "Flathub already configured"
+  warn "Skipping pacman database update + pacman package install"
 fi
 
-log "4) Installing your desktop apps via Flatpak (prevents duplicates)"
-for app in "${FLATPAK_APPS[@]}"; do
-  flatpak_install "$app"
-done
+if [[ "$DO_FLATPAK" == "true" ]]; then
+  log "3) Ensuring Flatpak has Flathub enabled"
+  if ! flatpak remote-list | awk '{print $1}' | grep -qx "flathub"; then
+    log "Adding Flathub remote"
+    flatpak remote-add --if-not-exists flathub https://flathub.org/repo/flathub.flatpakrepo
+  else
+    log "Flathub already configured"
+  fi
+
+  log "4) Installing your desktop apps via Flatpak (prevents duplicates)"
+  for app in "${FLATPAK_APPS[@]}"; do
+    flatpak_install "$app"
+  done
+else
+  warn "Skipping Flatpak/Flathub/app installs"
+fi
 
 # ------------------------------
 # Sunshine (Moonlight host)
 # ------------------------------
-log "5) Installing & configuring Sunshine (Moonlight host)"
+if [[ "$DO_SUNSHINE" == "true" ]]; then
+  log "5) Installing & configuring Sunshine (Moonlight host)"
 
-if ! have_cmd sunshine; then
-  warn "Sunshine not found in PATH (install may have failed). Skipping Sunshine setup."
+  if ! have_cmd sunshine; then
+    warn "Sunshine not found in PATH (install may have failed). Skipping Sunshine setup."
+  else
+    SUNSHINE_CMD="$(command -v sunshine)"
+    SUNSHINE_BIN="$(readlink -f "$SUNSHINE_CMD" 2>/dev/null || echo "$SUNSHINE_CMD")"
+
+    log "Sunshine command: $SUNSHINE_CMD"
+    log "Sunshine binary:  $SUNSHINE_BIN"
+
+    if have_cmd setcap; then
+      log "Applying cap_sys_admin+p to Sunshine binary (for KMS capture support)"
+      setcap cap_sys_admin+p "$SUNSHINE_BIN" || warn "setcap failed (you can retry later)."
+      getcap "$SUNSHINE_BIN" || true
+    else
+      warn "setcap not available. (Install libcap). KMS capture may not work."
+    fi
+
+    DEFAULT_RTSP_PORT="48010"
+    RTSP_PORT="$DEFAULT_RTSP_PORT"
+    if ss -ltn | awk '{print $4}' | grep -q ":${DEFAULT_RTSP_PORT}$"; then
+      RTSP_PORT="$(get_free_tcp_port)"
+      warn "Default RTSP port $DEFAULT_RTSP_PORT is already in use. Using $RTSP_PORT instead."
+    else
+      log "RTSP port $DEFAULT_RTSP_PORT appears free."
+    fi
+
+    if [[ -n "$TARGET_USER" && -n "${TARGET_UID:-}" ]]; then
+      ensure_sunshine_rtsp_port "$TARGET_USER" "$RTSP_PORT"
+    else
+      warn "Could not determine TARGET_USER / TARGET_UID; skipping Sunshine config write."
+    fi
+
+    if [[ -n "$TARGET_USER" ]]; then
+      log "Enabling Sunshine as a user service for: $TARGET_USER"
+
+      run_user_systemctl "$TARGET_USER" daemon-reload || true
+
+      log "Restarting user portal/pipewire services (helps Wayland capture)"
+      run_user_systemctl "$TARGET_USER" restart pipewire pipewire-pulse wireplumber 2>/dev/null || true
+      run_user_systemctl "$TARGET_USER" restart xdg-desktop-portal xdg-desktop-portal-kde 2>/dev/null || true
+
+      run_user_systemctl "$TARGET_USER" enable --now sunshine || true
+
+      log "Sunshine user-service status:"
+      run_user_systemctl "$TARGET_USER" status sunshine --no-pager || true
+    else
+      warn "TARGET_USER not set. Can't enable Sunshine user service automatically."
+    fi
+
+    echo
+    echo "Sunshine Web UI (first-time setup): https://localhost:47990"
+    echo "NOTE: If Sunshine shows a red banner on first install, a reboot or re-login often fixes the session/portal bits."
+  fi
 else
-  # Resolve real binary path for setcap (sunshine is often a symlink)
-  SUNSHINE_CMD="$(command -v sunshine)"
-  SUNSHINE_BIN="$(readlink -f "$SUNSHINE_CMD" 2>/dev/null || echo "$SUNSHINE_CMD")"
-
-  log "Sunshine command: $SUNSHINE_CMD"
-  log "Sunshine binary:  $SUNSHINE_BIN"
-
-  if have_cmd setcap; then
-    log "Applying cap_sys_admin+p to Sunshine binary (for KMS capture support)"
-    setcap cap_sys_admin+p "$SUNSHINE_BIN" || warn "setcap failed (you can retry later)."
-    getcap "$SUNSHINE_BIN" || true
-  else
-    warn "setcap not available. (Install libcap). KMS capture may not work."
-  fi
-
-  # Auto-pick a free RTSP port to avoid the common "RTSP port 48010 already in use" error
-  # Sunshine default RTSP port is commonly 48010; if something is already using it, pick another.
-  DEFAULT_RTSP_PORT="48010"
-  RTSP_PORT="$DEFAULT_RTSP_PORT"
-  if ss -ltn | awk '{print $4}' | grep -q ":${DEFAULT_RTSP_PORT}$"; then
-    RTSP_PORT="$(get_free_tcp_port)"
-    warn "Default RTSP port $DEFAULT_RTSP_PORT is already in use. Using $RTSP_PORT instead."
-  else
-    log "RTSP port $DEFAULT_RTSP_PORT appears free."
-  fi
-
-  # Update config for the logged-in user (Sunshine user service reads user config)
-  if [[ -n "$TARGET_USER" && -n "${TARGET_UID:-}" ]]; then
-    ensure_sunshine_rtsp_port "$TARGET_USER" "$RTSP_PORT"
-  else
-    warn "Could not determine TARGET_USER / TARGET_UID; skipping Sunshine config write."
-  fi
-
-  # Enable/start Sunshine user service
-  # This can fail if the user session bus isn't available yet; in that case we warn and tell them to reboot/relogin.
-  if [[ -n "$TARGET_USER" ]]; then
-    log "Enabling Sunshine as a user service for: $TARGET_USER"
-
-    # Reload user units
-    run_user_systemctl "$TARGET_USER" daemon-reload || true
-
-    # Restart portal/pipewire stack to reduce first-run Wayland weirdness
-    log "Restarting user portal/pipewire services (helps Wayland capture)"
-    run_user_systemctl "$TARGET_USER" restart pipewire pipewire-pulse wireplumber 2>/dev/null || true
-    run_user_systemctl "$TARGET_USER" restart xdg-desktop-portal xdg-desktop-portal-kde 2>/dev/null || true
-
-    # Enable + start Sunshine
-    run_user_systemctl "$TARGET_USER" enable --now sunshine || true
-
-    log "Sunshine user-service status:"
-    run_user_systemctl "$TARGET_USER" status sunshine --no-pager || true
-  else
-    warn "TARGET_USER not set. Can't enable Sunshine user service automatically."
-  fi
-
-  echo
-  echo "Sunshine Web UI (first-time setup): https://localhost:47990"
-  echo "NOTE: If Sunshine shows a red banner on first install, a reboot or re-login often fixes the session/portal bits."
+  warn "Skipping Sunshine setup"
 fi
 
 # --------------------------- FIREWALL + KDE CONNECT --------------------------
-# KDE Connect needs ports:
-# - TCP 1714-1764
-# - UDP 1714-1764
-if [[ "$USE_FIREWALLD" == "true" ]]; then
-  log "6) Configuring firewalld for KDE Connect"
-  enable_service firewalld
+if [[ "$DO_FIREWALL" == "true" ]]; then
+  if [[ "$USE_FIREWALLD" == "true" ]]; then
+    log "6) Configuring firewalld for KDE Connect"
+    enable_service firewalld
 
-  # Prefer the built-in kdeconnect service if available
-  if firewall-cmd --get-services | tr ' ' '\n' | grep -qx "kdeconnect"; then
-    log "Adding firewalld service: kdeconnect"
-    firewall-cmd --permanent --zone=public --add-service=kdeconnect || true
+    if firewall-cmd --get-services | tr ' ' '\n' | grep -qx "kdeconnect"; then
+      log "Adding firewalld service: kdeconnect"
+      firewall-cmd --permanent --zone=public --add-service=kdeconnect || true
+    else
+      warn "firewalld 'kdeconnect' service not found; adding ports manually"
+      firewall-cmd --permanent --zone=public --add-port=1714-1764/tcp || true
+      firewall-cmd --permanent --zone=public --add-port=1714-1764/udp || true
+    fi
+
+    firewall-cmd --reload || true
+    log "firewalld rules updated for KDE Connect"
   else
-    warn "firewalld 'kdeconnect' service not found; adding ports manually"
-    firewall-cmd --permanent --zone=public --add-port=1714-1764/tcp || true
-    firewall-cmd --permanent --zone=public --add-port=1714-1764/udp || true
+    warn "Skipping firewalld config (USE_FIREWALLD=false)"
   fi
-
-  firewall-cmd --reload || true
-  log "firewalld rules updated for KDE Connect"
 else
-  warn "Skipping firewalld config (USE_FIREWALLD=false)"
+  warn "Skipping firewall config"
 fi
 
 # --------------------------- OPTIONAL DEDUPE CLEANUP --------------------------
-# If you use Flatpaks for these apps, you usually DON'T want the pacman versions too.
-# This removes common duplicates if installed via pacman.
-#
-# NOTE: This only touches pacman packages (not Flatpaks).
-log "7) Optional cleanup: remove common duplicate pacman GUI apps"
-DUPLICATE_PACMAN_APPS=(
-  discord
-  steam
-  vlc
-  libreoffice-fresh
-  libreoffice-still
-  obs-studio
-)
+if [[ "$DO_DEDUPE" == "true" ]]; then
+  log "7) Optional cleanup: remove common duplicate pacman GUI apps"
+  DUPLICATE_PACMAN_APPS=(
+    discord
+    steam
+    vlc
+    libreoffice-fresh
+    libreoffice-still
+    obs-studio
+  )
 
-installed_dupes=()
-for p in "${DUPLICATE_PACMAN_APPS[@]}"; do
-  if pacman -Q "$p" >/dev/null 2>&1; then
-    installed_dupes+=("$p")
+  installed_dupes=()
+  for p in "${DUPLICATE_PACMAN_APPS[@]}"; do
+    if pacman -Q "$p" >/dev/null 2>&1; then
+      installed_dupes+=("$p")
+    fi
+  done
+
+  if (( ${#installed_dupes[@]} )); then
+    warn "Found pacman-installed GUI duplicates: ${installed_dupes[*]}"
+    warn "Removing them keeps your app list clean (Flatpak versions remain)."
+    pacman -Rns --noconfirm "${installed_dupes[@]}" || true
+  else
+    log "No pacman GUI duplicates found. Skipping."
   fi
-done
-
-if (( ${#installed_dupes[@]} )); then
-  warn "Found pacman-installed GUI duplicates: ${installed_dupes[*]}"
-  warn "Removing them keeps your app list clean (Flatpak versions remain)."
-  pacman -Rns --noconfirm "${installed_dupes[@]}" || true
 else
-  log "No pacman GUI duplicates found. Skipping."
+  warn "Skipping duplicate cleanup"
 fi
 
-# ============================================================
-# Proton tools enforcement
-# Enforce ProtonPlus and forbid ProtonUp-Qt
-# ============================================================
+# --------------------------- PROTON ENFORCEMENT ------------------------------
+if [[ "$DO_PROTON_ENFORCE" == "true" ]]; then
+  echo
+  echo "Ensuring ProtonPlus is installed and ProtonUp-Qt is removed..."
 
-echo
-echo "Ensuring ProtonPlus is installed and ProtonUp-Qt is removed..."
+  flatpak uninstall -y net.davidotek.pupgui2 2>/dev/null || true
+  flatpak install -y flathub com.vysp3r.ProtonPlus || true
 
-# Remove ProtonUp-Qt Flatpak if present
-flatpak uninstall -y net.davidotek.pupgui2 2>/dev/null || true
-
-# Ensure ProtonPlus is installed
-flatpak install -y flathub com.vysp3r.ProtonPlus || true
-
-echo "Proton setup complete (ProtonPlus only)."
+  echo "Proton setup complete (ProtonPlus only)."
+else
+  warn "Skipping Proton enforcement"
+fi
 
 # --------------------------- FINAL NOTES --------------------------------------
 
