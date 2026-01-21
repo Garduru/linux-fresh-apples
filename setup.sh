@@ -3,7 +3,7 @@
 # Arch/CachyOS-focused (pacman)
 
 SCRIPT_NAME="linux-fresh-apples"
-SCRIPT_VERSION="v1.0.1"
+SCRIPT_VERSION="v1.1.0"
 
 # Version flag
 if [[ "${1:-}" == "--version" || "${1:-}" == "-v" ]]; then
