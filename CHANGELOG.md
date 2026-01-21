@@ -4,6 +4,20 @@ All notable changes to this project will be documented in this file.
 
 This project loosely follows **Semantic Versioning (SemVer)**.
 
+## [1.1.0] – 2026-01-21
+
+### Added
+- (Planned/Initial) Terminal UI groundwork for toggling install options (packages/services/apps)
+- Improved Sunshine setup reliability for Wayland + user services
+- More defensive checks for user-session availability when enabling `systemctl --user`
+
+### Improved
+- Script organization and readability
+- Safer reruns (idempotent behavior)
+
+### Notes
+- v1.1.0 is the start of the “toggleable installer” direction (TUI-based selection)
+
 ---
 
 ## [1.0.1] – 2026-01-21
