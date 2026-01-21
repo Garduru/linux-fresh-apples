@@ -1,38 +1,51 @@
-# 🍎 linux-fresh-apples 🍎
+# 🍎 Linux Fresh Apples 🍎
 
-Personal Linux setup script (Arch / CachyOS focused) for getting a fresh install into a usable daily-driver state.
+Personal Linux setup script (Arch / CachyOS focused) for turning a fresh install into a usable daily-driver system.
 
-This is a **post-install bootstrap script** I use to quickly set up my system the way I like it after installing Arch-based distros (especially CachyOS).
+This is a **post-install bootstrap script** I use after installing Arch-based distros (especially CachyOS) to get my system configured quickly, cleanly, and consistently.
 
 ---
 
-## What this script does
+## ✨ What this script does
 
-- Updates pacman databases
+- Updates pacman package databases
 - Installs core CLI and system packages
 - Enables Flatpak and Flathub
-- Installs desktop apps via Flatpak (prevents duplicates)
+- Installs desktop applications via Flatpak (prevents duplicates)
+- Installs and configures **Sunshine** (Moonlight game streaming host)
+  - Applies required capabilities for KMS capture
+  - Enables Sunshine as a **user service**
+  - Starts Sunshine automatically on login
+  - Displays Sunshine Web UI URL for first-time setup
 - Configures firewalld for KDE Connect
-- Optional cleanup to remove common duplicate pacman GUI apps
-- Ensures **ProtonPlus** is installed and **ProtonUp-Qt** is removed
+- Optionally removes duplicate pacman GUI applications
+- Ensures **ProtonPlus** is installed
+- Removes **ProtonUp-Qt** to prevent duplicate Proton managers
+- Prompts for confirmation before making any system changes
 
 ---
 
-## Supported systems
+## 🖥 Supported systems
 
-- Arch Linux  
-- CachyOS  
-- Other Arch-based distros **may work**, but are not guaranteed
+- Arch Linux
+- CachyOS
+- Other Arch-based distros *may work* but are not guaranteed
 
-⚠️ This script uses `pacman`, `flatpak`, and `firewalld`.
+⚠️ This script uses:
+- `pacman`
+- `flatpak`
+- `firewalld`
 
 ---
 
-## Safety confirmation
+## 🔐 Safety confirmation
 
-Before doing anything, the script **prints what it will do** and asks for confirmation.
+Before doing anything, the script:
 
-Anything other than `yes` will abort safely.
+- Prints **exactly what it will do**
+- Requires typing **`yes`** to continue
+
+Anything else safely aborts.
 
 ---
 
